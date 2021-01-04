@@ -60,12 +60,13 @@ print("connected.  type stuff")
 i=0
 
 while True:
-    NumData = 100*round(math.sin(i*(math.pi/8)),3)
-    data = str(NumData)
-    i += 1
-    data = data + ',' + str(-NumData) + ',' + data
-    #data = input()
-    #if len(data) == 0: break
+    #waits for a time interval and then access all relevant data
+    #read from the ChairState.txt database 
+    PresenceFile = open("ChairState.txt", "r")
+    UserStateFile = open("UserState.txt","r")
+
+    data = PresenceFile.read() + "," + UserStateFile.read()
+
     sock.send(data)
     time.sleep(30)
 
