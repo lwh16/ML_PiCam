@@ -121,6 +121,7 @@ if __name__ == "__main__":
     camera.vflip = True
     stream = io.BytesIO()
     #camera.start_preview()
+    prevState = ""
     while True:
         s_time = time.time()
         print("save")
@@ -136,7 +137,11 @@ if __name__ == "__main__":
             stream.flush()
             stream = io.BytesIO()
             #print(prediction)
-            print("Prediction : " + prediction["Prediction"])
-            print("Confidence : " + str(prediction["Confidences"]))
+            state = prediction["Prediction"]
+            if (state != prevState):
+                
+                print("Prediction : " + prediction["Prediction"])
+                print("Confidence : " + str(prediction["Confidences"]))
+                
             f_time = time.time()
-            print("Time taken : " + str(f_time - s_time))
+            prevState = state
