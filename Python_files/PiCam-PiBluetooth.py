@@ -54,7 +54,8 @@ print("connecting to \"%s\" on %s" % (name, host))
 
 # Create the client socket
 sock=BluetoothSocket( RFCOMM )
-sock.connect((host, port))
+print(port)
+sock.connect((host, 1))
 
 print("connected.  type stuff")
 i=0
@@ -65,9 +66,9 @@ while True:
     PresenceFile = open("ChairState.txt", "r")
     UserStateFile = open("UserState.txt","r")
 
-    data = PresenceFile.read() + "," + UserStateFile.read()
-
+    data = str(PresenceFile.read()) + "," + str(UserStateFile.read())
+    print(data)
     sock.send(data)
-    time.sleep(30)
+    time.sleep(15)
 
 sock.close()

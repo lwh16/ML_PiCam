@@ -134,32 +134,39 @@ if __name__ == "__main__":
     stream = io.BytesIO()
     #camera.start_preview()
     prevChairState = ""
-    state = ""
+    ChairState = ""
+    s_time = time.time() - 15 #for the first loop
     while True:
         #initate the camera and capture the picture
         camera.capture(stream, format='jpeg', use_video_port=True)
         stream.seek(0)
         #save image to stream
         image = Image.open(stream)
-        # Assume model is in the parent directory for this file
-        model_dir = os.getcwd() + "/presence"
-        #print(model_dir)
-        #run the first model that detects presence in the chair
-        prediction = main(image, model_dir)
-        #extract the state - is there someone in the chair?
-        ChairState = prediction["Prediction"]
-        #check whether this is the same as last time or not
-        if ChairState != prevChairState:
-            print("Prediction : " + prediction["Prediction"])
-            print("Confidence : " + str(prediction["Confidences"]))
-            #create a new entry in the presence text file
-            file1 = open("ChairState.txt","w")
-            now = datetime.now()
-            date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
-            #write this change to the text file
-            file1.write(str(date_time) + "," + str(state) + "\n")
-            file1.close()
-            prevChairState = ChairState
+        #check whether use is in their chair every 15 seconds
+        if time.time() > s_time + 15:
+            # Assume model is in the parent directory for this file
+            model_dir = os.getcwd() + "/presence"
+            #print(model_dir)
+            #run the first model that detects presence in the chair
+            prediction = main(image, model_dir)
+            #extract the state - is there someone in the chair?
+            ChairState = prediction["Prediction"]
+            #check whether this is the same as last time or not
+            if ChairState != prevChairState:
+                print("Prediction : " + prediction["Prediction"])
+                print("Confidence : " + str(prediction["Confidences"]))
+                #create a new entry in the presence text file
+                file1 = open("ChairState.txt","w")
+                now = datetime.now()
+                date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
+                #write this change to the text file
+                newLine = str(date_time) + "," + str(ChairState)
+                print(newLine)
+                file1.write(newLine)
+                file1.close()
+                prevChairState = ChairState
+                
+            s_time = time.time()
 
         #If there is someone sitting in the chair, then apply the Distraction detection model to them
         #if ChairState == "Sitting_In_Chair":
