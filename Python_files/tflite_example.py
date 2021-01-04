@@ -140,3 +140,6 @@ if __name__ == "__main__":
             print("Confidence : " + str(prediction["Confidences"]))
             f_time = time.time()
             print("Time taken : " + str(f_time - s_time))
+
+
+#this is from my laptop
