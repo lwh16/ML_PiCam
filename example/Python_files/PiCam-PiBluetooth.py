@@ -80,4 +80,8 @@ while True:
     except:
         #error in wither the connection or the data reading
         print("Error in either the bluetooth or the data reading")
+        try:
+            sock.close()
+        except:
+            print("Sock wasn't open yet")
         #try loop attempts to reconnect
