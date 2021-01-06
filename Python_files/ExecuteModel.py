@@ -100,15 +100,6 @@ def process_image(image, input_shape):
     return image.reshape(input_shape).astype(np.float32)
 
 
-def UserStateTxtOrder(UserState):
-    #Take in the prediction and output the list order of the prediction
-    if UserState == "Focused":
-        return 1
-    if UserState == "Drinking":
-        return 2
-    #etc
-
-
 def main(image, model_dir):
     """
     Load the model and signature files, start the TF Lite interpreter, and run prediction on the image.
@@ -126,74 +117,130 @@ def main(image, model_dir):
     prediction["Prediction"] = labels[confidences.index(max_confidence)]
     return prediction
 
+def chairStateModel(image):
+    """
+    This function uses the Presence_TFLite model to determine whether the user is in their chair
+    """
+    # Assume model is in the parent directory for this file
+    model_dir = os.getcwd() + "/Presence_TFLite_2"
+    #run the first model that detects presence in the chair
+    prediction = main(image, model_dir)
+    #extract the state - is there someone in the chair?
+    sittingState = prediction["Prediction"]
+    
+    print("Prediction : " + prediction["Prediction"])
+    print("Confidence : " + str(prediction["Confidences"]))
+    
+    return sittingState
 
-if __name__ == "__main__":
+def userStateModel(image, focusTime, phoneTime, nonFocusTime):
+    """
+    Checks to see if the user is focused or not and returns edited values for those
+    """
+    model_dir = os.getcwd() + "/UserState_TFLite"
+    #run the first model that detects presence in the chair
+    UserPrediction = main(image, model_dir)
+    UserState = UserPrediction["Prediction"]
+    UserStateConfidences = UserPrediction["Confidences"]
+    print(UserState)
+    print(UserStateConfidences)
+    
+    if UserState == "Focused":
+        if UserStateConfidences[0] > 0.99:
+            #this is a definitely focused state
+            focusTime += 1
+            return focusTime, phoneTime, nonFocusTime
+        
+        else:
+            #this is a nonfocused, but not on phone state
+            nonFocusTime += 1
+            return focusTime, phoneTime, nonFocusTime
+        
+    elif UserState == "On_Phone":
+        if UserStateConfidences[1] > 0.99:
+            #definite phone state
+            phoneTime += 1
+            nonFocusTime += 1
+            return focusTime, phoneTime, nonFocusTime
+        
+        else:
+            #unfocused, but not definitely on phone
+            nonFocusTime += 1
+            return focusTime, phoneTime, nonFocusTime
+        
+    else:
+        #catch possible errors
+        return focusTime, phoneTime, nonFocusTime
+            
+    
+
+
+def MLModels():
     #extract image with picamera
     camera = picamera.PiCamera(resolution=(1024, 768), framerate=10)
-    camera.vflip = True
+    #camera.vflip = True
     stream = io.BytesIO()
-    #camera.start_preview()
-    prevChairState = ""
-    ChairState = ""
-    s_time = time.time() - 15 #for the first loop
+    
+    #decalre values for the states
+    sittingState = "" #starts with default
+    focusTime = 0
+    phoneTime = 0
+    nonFocusTime = 0
+    
+    #decalre values for the timers
+    s_time = time.time() - 16 #for the first loop
+    prevSecond = 0
+    
     while True:
+        #every minute the values being calcualted from the model need to be pushed to a text
+        #file so that they can be sent to the other Pi
+        now = datetime.now()
+        currentSecond = int(now.strftime("%S"))
+        if currentSecond < prevSecond:
+            #this means that a minute has passed and the second clock has returned to zero
+            #hence push the values to the txt file
+            totalTime = focusTime + nonFocusTime
+            #calcualte the times as ratio for the full 60s
+            focusTime = 60*(focusTime/totalTime)
+            nonFocusTime = 60*(nonFocusTime/totalTime)
+            phoneTime = 60*(phoneTime/totalTime)
+            
+            file1 = open("PiCamData.txt","w")
+            #write this change to the text file
+            print(sittingState + "," + str(round(focusTime,2)) + "," +  str(round(phoneTime,2))  + "," + str(round(nonFocusTime,2)))
+            file1.write(sittingState + "," + str(focusTime) + "," +  str(phoneTime)  + "," + str(nonFocusTime))
+            file1.close()
+            focusTime = 0
+            phoneTime = 0
+            nonFocusTime = 0
+
+        prevSecond = currentSecond
+
         #initate the camera and capture the picture
         camera.capture(stream, format='jpeg', use_video_port=True)
         stream.seek(0)
         #save image to stream
         image = Image.open(stream)
-        #check whether use is in their chair every 15 seconds
+        
+        #check whether use is in their chair every 30 seconds - this avoids clogging the programme with unnesscessary model runs
         if time.time() > s_time + 15:
-            # Assume model is in the parent directory for this file
-            model_dir = os.getcwd() + "/presence"
-            #print(model_dir)
-            #run the first model that detects presence in the chair
-            prediction = main(image, model_dir)
-            #extract the state - is there someone in the chair?
-            ChairState = prediction["Prediction"]
-            #check whether this is the same as last time or not
-            if ChairState != prevChairState:
-                print("Prediction : " + prediction["Prediction"])
-                print("Confidence : " + str(prediction["Confidences"]))
-                #create a new entry in the presence text file
-                file1 = open("ChairState.txt","w")
-                now = datetime.now()
-                date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
-                #write this change to the text file
-                newLine = str(date_time) + "," + str(ChairState)
-                print(newLine)
-                file1.write(newLine)
-                file1.close()
-                prevChairState = ChairState
-                
+            #run the model
+            sittingState = chairStateModel(image)
+            print(sittingState)            
             s_time = time.time()
 
-        #If there is someone sitting in the chair, then apply the Distraction detection model to them
-        #if ChairState == "Sitting_In_Chair":
-            #Use the original image for the model
-            #model_dir = os.getcwd() + "/distraction"
-            #run the first model that detects presence in the chair
-            #UserPrediction = main(image, model_dir)
-            #UserState = UserPrediction["Prediction"]
-            #read the previously saved states file and save to a list
-            #savedStates = []
-            #with open("UserState.txt", "r") as file2:
-            #    contents = file2.readlines()
-            #    for line in contents:
-            #        current = line[:-1]
-            #        savedStates.append(current)
-
-            #first value in the list is the time of the previous save
-            #oldTime = savedStates[0]
-            #now = datetime.now()
-            #newTime = now.strftime("%m/%d/%Y, %H:%M:%S")
-            #timeDiff = newTime - oldTime
-            #Convert the saved time back
-            #savedStates[0] = newTime
-
-            #Which element of the text file should be edited
-            #index = UserStateTxtOrder(UserState)
-            #savedStates[index] += timeDiff
-
+        #If there is someone sitting in the chair, then apply the UserState detection model to them
+        if sittingState == "Sitting_In_Chair":
+            
+            focusTime, phoneTime, nonFocusTime = userStateModel(image, focusTime, phoneTime, nonFocusTime)
+            
+        #reset the image stream
         stream.flush()
         stream = io.BytesIO()
+        
+if __name__ == "__main__":
+    while True:
+        try:
+            MLModels()
+        except:
+            print("Model run failed, retrying...")

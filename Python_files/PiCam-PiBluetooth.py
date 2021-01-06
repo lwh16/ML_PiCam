@@ -22,53 +22,68 @@ import sys
 import time
 import math
 
-if sys.version < '3':
-    input = raw_input
-
-addr = "B8:27:EB:B0:03:7F"
-
-if len(sys.argv) < 2:
-    print("no device specified.  Searching all nearby bluetooth devices for")
-    print("the SampleServer service")
-else:
-    addr = sys.argv[1]
-    print("Searching for SampleServer on %s" % addr)
-
-# search for the SampleServer service
-uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
-service_matches = find_service( uuid = uuid, address = addr )
-
-if len(service_matches) == 0:
-    print("couldn't find the SampleServer service =(")
-    sys.exit(0)
-
-first_match = service_matches[0]
-port = first_match["port"]
-name = first_match["name"]
-host = first_match["host"]
-print("port : " + str(port))
-print("name : " + str(name))
-print("host : " + str(host))
-
-print("connecting to \"%s\" on %s" % (name, host))
-
-# Create the client socket
-sock=BluetoothSocket( RFCOMM )
-print(port)
-sock.connect((host, 1))
-
-print("connected.  type stuff")
-i=0
-
+#repeat this forever
 while True:
-    #waits for a time interval and then access all relevant data
-    #read from the ChairState.txt database 
-    PresenceFile = open("ChairState.txt", "r")
-    UserStateFile = open("UserState.txt","r")
+    #try to connect -if this works go onto the infinite loop
+    try:
 
-    data = str(PresenceFile.read()) + "," + str(UserStateFile.read())
-    print(data)
-    sock.send(data)
-    time.sleep(15)
+        if sys.version < '3':
+            input = raw_input
 
-sock.close()
+        addr = "B8:27:EB:B0:03:7F"
+
+        if len(sys.argv) < 2:
+            print("Searching all nearby bluetooth devices...")
+        else:
+            addr = sys.argv[1]
+            print("Searching for SampleServer on %s" % addr)
+
+        # search for the SampleServer service
+        uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+        service_matches = find_service( uuid = uuid, address = addr )
+
+        if len(service_matches) == 0:
+            print("couldn't find the SampleServer service =(")
+            sys.exit(0)
+
+        first_match = service_matches[0]
+        port = first_match["port"]
+        name = first_match["name"]
+        host = first_match["host"]
+        print("port : " + str(port))
+        print("name : " + str(name))
+        print("host : " + str(host))
+
+        print("connecting to \"%s\" on %s" % (name, host))
+
+        # Create the client socket
+        sock=BluetoothSocket( RFCOMM )
+        print(port)
+        sock.connect((host, 1))
+
+        print("connected.  type stuff")
+        i=0
+
+        while True:
+            #waits for a time interval and then access all relevant data
+            #read from the ChairState.txt database 
+            PiCamData = open("PiCamData.txt", "r")
+
+            data = str(PiCamData.read())
+            print(data)
+            sock.send(data)
+            time.sleep(60)
+
+        sock.close()
+    
+    except:
+        #error in wither the connection or the data reading
+        print("!!!! Timeout !!!!")
+        try:
+            sock.close()
+            print("Error in writing to the text file")
+        except:
+            print("Error in connecting bluetooth")
+        #try loop attempts to reconnect
+        print("Retrying")
+        print("---------------------------------------------------------")
