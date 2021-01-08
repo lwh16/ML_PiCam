@@ -165,7 +165,7 @@ def userStateModel(image, focusTime, phoneTime, nonFocusTime):
         
         else:
             #unfocused, but not definitely on phone
-            nonFocusTime += 1
+            nonfocusTime += 1
             return focusTime, phoneTime, nonFocusTime
         
     else:
@@ -177,7 +177,10 @@ def userStateModel(image, focusTime, phoneTime, nonFocusTime):
 
 def MLModels():
     #extract image with picamera
-    camera = picamera.PiCamera(resolution=(1024, 768), framerate=10)
+    #picamera.PiCamera(camera_num=0, resolution=(1024, 768), framerate=10).close()
+    print("MLModels() running...")
+    #camera = picamera.PiCamera(camera_num=0, resolution=(1024, 768), framerate=10)
+    print("camera created successfully")
     #camera.vflip = True
     stream = io.BytesIO()
     
@@ -194,6 +197,7 @@ def MLModels():
     while True:
         #every minute the values being calcualted from the model need to be pushed to a text
         #file so that they can be sent to the other Pi
+        print("Entered while loop")
         now = datetime.now()
         currentSecond = int(now.strftime("%S"))
         if currentSecond < prevSecond:
@@ -201,9 +205,9 @@ def MLModels():
             #hence push the values to the txt file
             totalTime = focusTime + nonFocusTime
             #calcualte the times as ratio for the full 60s
-            focusTime = 60*(focusTime/totalTime)
-            nonFocusTime = 60*(nonFocusTime/totalTime)
-            phoneTime = 60*(phoneTime/totalTime)
+            focusTime = round((focusTime/totalTime),2)
+            nonFocusTime = round((nonFocusTime/totalTime),2)
+            phoneTime = round((phoneTime/totalTime),2)
             
             file1 = open("PiCamData.txt","w")
             #write this change to the text file
@@ -217,10 +221,18 @@ def MLModels():
         prevSecond = currentSecond
 
         #initate the camera and capture the picture
+        print("about to capture with camera")
+        camera = picamera.PiCamera(resolution=(1024, 768), framerate=10)
         camera.capture(stream, format='jpeg', use_video_port=True)
+        camera.close()
+        print("Camera capture successfully")
+        
         stream.seek(0)
         #save image to stream
         image = Image.open(stream)
+        #reset the image stream
+        stream.flush()
+        stream = io.BytesIO()
         
         #check whether use is in their chair every 30 seconds - this avoids clogging the programme with unnesscessary model runs
         if time.time() > s_time + 15:
@@ -231,12 +243,10 @@ def MLModels():
 
         #If there is someone sitting in the chair, then apply the UserState detection model to them
         if sittingState == "Sitting_In_Chair":
-            
+            t1 = time.time()
             focusTime, phoneTime, nonFocusTime = userStateModel(image, focusTime, phoneTime, nonFocusTime)
-            
-        #reset the image stream
-        stream.flush()
-        stream = io.BytesIO()
+            t2 = time.time()
+            print(t2-t1)
         
 if __name__ == "__main__":
     while True:
